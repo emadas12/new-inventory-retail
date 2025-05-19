@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from backend.models import db, Product, RestockLog
-from backend.app_config import Config
+from models import db, Product, RestockLog
+from app_config import Config
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -197,5 +197,5 @@ if __name__ == '__main__':
         for row in result:
             print("🧬 Flask DB OID:", row[0], "| Name:", row[1])
 
-    app.run(host='localhost', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
