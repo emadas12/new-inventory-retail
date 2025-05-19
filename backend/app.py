@@ -1,12 +1,16 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from models import db, Product, RestockLog
-from config import Config
+from backend.models import db, Product, RestockLog
+from backend.app_config import Config
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config.from_object(Config)
+
+print("✅ Connected to DB:", app.config['SQLALCHEMY_DATABASE_URI'])  # ← תוקן
+
+
 
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:8080"}})
 db.init_app(app)
@@ -183,6 +187,15 @@ def inventory_metrics():
 
 # -------------------- MAIN --------------------
 if __name__ == '__main__':
+    from sqlalchemy import text
+
     with app.app_context():
         db.create_all()
+
+        # הדפסת OID ושם מסד הנתונים
+        result = db.session.execute(text("SELECT oid, datname FROM pg_database WHERE datname = current_database();"))
+        for row in result:
+            print("🧬 Flask DB OID:", row[0], "| Name:", row[1])
+
     app.run(host='localhost', port=5000, debug=True)
+

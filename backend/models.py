@@ -1,10 +1,9 @@
-# models.py
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
 class Product(db.Model):
-    __tablename__ = 'product'
+    __tablename__ = 'products'
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -37,7 +36,7 @@ class RestockLog(db.Model):
     __tablename__ = 'restock_log'
 
     id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id', ondelete="CASCADE"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete="CASCADE"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
