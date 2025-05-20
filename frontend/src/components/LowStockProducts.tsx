@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -35,6 +34,7 @@ const LowStockProducts: React.FC = () => {
           Restock
         </Button>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-4">
@@ -53,7 +53,7 @@ const LowStockProducts: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-4">
                   <span className="text-inventory-red font-medium">
-                    {product.stock} / {product.lowStockThreshold}
+                    {product.stockLevel} / {product.lowStockThreshold}
                   </span>
                   <Button
                     variant="ghost"

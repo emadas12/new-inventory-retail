@@ -1,17 +1,14 @@
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   sku: string;
   category: string;
   price: number;
-  cost: number;
-  stock: number; // חשוב: השתמש ב-stock (לא stock_level) בקוד frontend
+  cost?: number;
+  stockLevel: number;
   lowStockThreshold: number;
   description?: string;
-  image?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 

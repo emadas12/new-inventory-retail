@@ -1,5 +1,3 @@
-### 📦 Full Docker Setup to Add pgAdmin with PostgreSQL and Flask ###
-
 version: '3.8'
 
 services:
@@ -18,7 +16,7 @@ services:
 
   backend:
     build:
-      context: ./backend     
+      context: ./backend
     container_name: gogo-main-backend-1
     restart: always
     ports:
@@ -30,6 +28,15 @@ services:
       - FLASK_ENV=development
     command: python app.py
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: gogo-main-frontend-1
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
   pgadmin:
     image: dpage/pgadmin4

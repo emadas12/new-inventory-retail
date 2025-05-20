@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -67,41 +66,46 @@ const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.sku}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell className="text-right">
-                    ${product.price.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">{product.stock}</TableCell>
-                  <TableCell className="text-center">
-                    {product.stock <= product.lowStockThreshold ? (
-                      <div className="flex items-center justify-center">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Low Stock
+              filteredProducts.map((product) => {
+                const isLowStock =
+                  product.stockLevel < (product.lowStockThreshold ?? 10);
+
+                return (
+                  <TableRow key={product.id}>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell>{product.sku}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell className="text-right">
+                      ${product.price.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">{product.stockLevel}</TableCell>
+                    <TableCell className="text-center">
+                      {isLowStock ? (
+                        <div className="flex items-center justify-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Low Stock
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          In Stock
                         </span>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        In Stock
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/products/${product.id}`)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Edit</span>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/products/${product.id}`)}
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Edit</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
