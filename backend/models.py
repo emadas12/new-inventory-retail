@@ -4,7 +4,7 @@ db = SQLAlchemy()
 
 # -------------------- Product Model --------------------
 class Product(db.Model):
-    __tablename__ = 'products'  # ✅ הוסף שורת טבלה
+    __tablename__ = 'products'  # חייב להיות זהה ל־ForeignKey
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -14,6 +14,14 @@ class Product(db.Model):
     cost = db.Column(db.Float)
     stock_level = db.Column(db.Integer, default=0)
     low_stock_threshold = db.Column(db.Integer, default=10)
+
+    # ✅ קשר דו-כיווני עם RestockLog
+    restock_logs = db.relationship(
+        "RestockLog",
+        backref="product",  # מאפשר self.product מתוך RestockLog
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
 
     def to_dict(self):
         return {
@@ -25,20 +33,6 @@ class Product(db.Model):
             "cost": self.cost,
             "stock_level": self.stock_level,
             "low_stock_threshold": self.low_stock_threshold,
-        }
-
-
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "sku": self.sku,
-            "category": self.category,
-            "price": self.price,
-            "cost": self.cost,
-            "stock_level": self.stock_level,
-            "low_stock_threshold": self.low_stock_threshold,  # ✅ כלול בתגובה
         }
 
 
