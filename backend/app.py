@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from models import db, Product, RestockLog
+from models import db, Product, RestockLog, LowStockProduct
 from app_config import Config
 from datetime import datetime, timedelta
 from sqlalchemy import text
@@ -10,7 +10,7 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config.from_object(Config)
 
-print("\u2705 Connected to DB:", app.config['SQLALCHEMY_DATABASE_URI'])
+print("✅ Connected to DB:", app.config['SQLALCHEMY_DATABASE_URI'])
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 db.init_app(app)
@@ -35,6 +35,18 @@ def manage_products():
                 low_stock_threshold=data.get('low_stock_threshold', 10)
             )
             db.session.add(new_product)
+            db.session.flush()  # לקבלת ID לפני commit
+
+            # הוספה לטבלת low_stock_products אם המלאי נמוך מהסף
+            if new_product.stock_level <= new_product.low_stock_threshold:
+                low_stock_entry = LowStockProduct(
+                    product_id=new_product.id,
+                    name=new_product.name,
+                    sku=new_product.sku,
+                    stock_level=new_product.stock_level
+                )
+                db.session.add(low_stock_entry)
+
             db.session.commit()
             return jsonify(new_product.to_dict()), 201
         except KeyError as e:
@@ -105,7 +117,6 @@ def low_stock_products():
         if product.stock_level < (product.low_stock_threshold or 10)
     ]
     return jsonify([product.to_dict() for product in low_stock]), 200
-
 
 @app.route('/api/dashboard/summary', methods=['GET'])
 def dashboard_summary():
@@ -189,6 +200,6 @@ if __name__ == '__main__':
         db.create_all()
         result = db.session.execute(text("SELECT oid, datname FROM pg_database WHERE datname = current_database();"))
         for row in result:
-            print("\U0001f9ec Flask DB OID:", row[0], "| Name:", row[1])
+            print("🧠 Flask DB OID:", row[0], "| Name:", row[1])
 
     app.run(host='0.0.0.0', port=5000, debug=True)
