@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Product } from "@/types";
 import { toast } from "@/hooks/use-toast";
 
+// ✅ schema תואם לשמות ה־snake_case של הטופס
 const formSchema = z.object({
   name: z.string().min(2, {
     message: "Name must be at least 2 characters.",
@@ -44,7 +45,7 @@ const formSchema = z.object({
 
 interface ProductFormProps {
   product?: Product;
-  onSubmit: (data: z.infer<typeof formSchema>) => void;
+  onSubmit: (data: any) => void; // אנחנו שולחים snake_case ל־API
   isSubmitting: boolean;
 }
 
@@ -56,7 +57,16 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: product
-      ? { ...product }
+      ? {
+          name: product.name,
+          sku: product.sku,
+          category: product.category,
+          price: product.price,
+          cost: product.cost,
+          stock_level: product.stockLevel ?? 0,
+          lowStockThreshold: product.lowStockThreshold ?? 10,
+          description: product.description ?? "",
+        }
       : {
           name: "",
           sku: "",
@@ -71,7 +81,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await onSubmit(values);
+      const transformed = {
+        ...values,
+        stock_level: values.stock_level,
+        low_stock_threshold: values.lowStockThreshold,
+      };
+
+      await onSubmit(transformed);
+
       toast({
         title: product ? "Product updated" : "Product created",
         description: product
@@ -159,9 +176,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                 <FormControl>
                   <Input type="number" step="0.01" {...field} />
                 </FormControl>
-                <FormDescription>
-                  Purchase cost per unit
-                </FormDescription>
+                <FormDescription>Purchase cost per unit</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -220,7 +235,9 @@ const ProductForm: React.FC<ProductFormProps> = ({
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? "Saving..."
-              : product ? "Update Product" : "Create Product"}
+              : product
+              ? "Update Product"
+              : "Create Product"}
           </Button>
         </div>
       </form>

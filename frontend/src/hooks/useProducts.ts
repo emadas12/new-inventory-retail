@@ -7,11 +7,14 @@ const fetchProducts = async (): Promise<Product[]> => {
   const res = await fetch(`${API_URL}/products`);
   if (!res.ok) throw new Error("Failed to fetch products");
   const data = await res.json();
-  console.log("Raw data from backend:", data);
+  console.log("✅ Raw data from backend:", data);
+
   return data.map((product: any) => ({
     ...product,
+    id: product.id.toString(),
     stock: product.stock_level,
-    id: product.id.toString(), // ✅ חשוב: מתאים ל־Select
+    stockLevel: product.stock_level,
+    lowStockThreshold: product.low_stock_threshold ?? 10,
   }));
 };
 
@@ -19,12 +22,20 @@ const fetchProduct = async (id: string): Promise<Product> => {
   const res = await fetch(`${API_URL}/products/${id}`);
   if (!res.ok) throw new Error("Failed to fetch product");
   const product = await res.json();
+
   return {
-    ...product,
-    stock: product.stock_level,
-    id: product.id.toString(), // תואם גם כאן
+    id: product.id.toString(),
+    name: product.name,
+    sku: product.sku,
+    category: product.category,
+    price: product.price,
+    cost: product.cost,
+    stockLevel: product.stock_level,
+    lowStockThreshold: product.low_stock_threshold ?? 10,
+    description: product.description ?? "",
   };
 };
+
 
 const createProduct = async (
   productData: Omit<Product, "id" | "createdAt" | "updatedAt">
