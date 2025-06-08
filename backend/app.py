@@ -1,9 +1,10 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from models import db, Product, RestockLog, LowStockProduct
 from app_config import Config
 from datetime import datetime, timedelta
 from sqlalchemy import text
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST  # ✅ Prometheus raw metrics
 
 # -------------------- APP INIT --------------------
 app = Flask(__name__)
@@ -35,9 +36,8 @@ def manage_products():
                 low_stock_threshold=data.get('low_stock_threshold', 10)
             )
             db.session.add(new_product)
-            db.session.flush()  # לקבלת ID לפני commit
+            db.session.flush()
 
-            # הוספה לטבלת low_stock_products אם המלאי נמוך מהסף
             if new_product.stock_level <= new_product.low_stock_threshold:
                 low_stock_entry = LowStockProduct(
                     product_id=new_product.id,
@@ -76,6 +76,22 @@ def product_detail(product_id):
             if new_stock != old_stock:
                 db.session.add(RestockLog(product_id=product.id, quantity=new_stock - old_stock))
 
+            if new_stock > product.low_stock_threshold:
+                db.session.query(LowStockProduct).filter_by(product_id=product.id).delete()
+            else:
+                low_stock_entry = LowStockProduct.query.filter_by(product_id=product.id).first()
+                if low_stock_entry:
+                    low_stock_entry.name = product.name
+                    low_stock_entry.sku = product.sku
+                    low_stock_entry.stock_level = product.stock_level
+                else:
+                    db.session.add(LowStockProduct(
+                        product_id=product.id,
+                        name=product.name,
+                        sku=product.sku,
+                        stock_level=product.stock_level
+                    ))
+
             db.session.commit()
             return jsonify(product.to_dict()), 200
         except KeyError as e:
@@ -83,26 +99,12 @@ def product_detail(product_id):
 
     elif request.method == 'DELETE':
         RestockLog.query.filter_by(product_id=product.id).delete()
+        db.session.query(LowStockProduct).filter_by(product_id=product.id).delete()
         db.session.delete(product)
         db.session.commit()
         return jsonify({'result': True}), 204
 
 # -------------------- RESTOCK ROUTES --------------------
-@app.route('/api/products/<int:product_id>/restock', methods=['POST'])
-def restock_product(product_id):
-    data = request.get_json()
-    product = Product.query.get_or_404(product_id)
-
-    try:
-        quantity = data['quantity']
-        product.stock_level += quantity
-        db.session.add(product)
-        db.session.add(RestockLog(product_id=product_id, quantity=quantity))
-        db.session.commit()
-        return jsonify(product.to_dict()), 200
-    except KeyError as e:
-        return jsonify({"error": f"Missing field: {e}"}), 400
-
 @app.route('/api/restocks', methods=['GET'])
 def get_restock_logs():
     logs = RestockLog.query.order_by(RestockLog.timestamp.desc()).limit(5).all()
@@ -111,12 +113,8 @@ def get_restock_logs():
 # -------------------- DASHBOARD ROUTES --------------------
 @app.route('/api/products/low-stock', methods=['GET'])
 def low_stock_products():
-    products = Product.query.all()
-    low_stock = [
-        product for product in products
-        if product.stock_level < (product.low_stock_threshold or 10)
-    ]
-    return jsonify([product.to_dict() for product in low_stock]), 200
+    entries = LowStockProduct.query.order_by(LowStockProduct.timestamp.desc()).all()
+    return jsonify([entry.to_dict() for entry in entries]), 200
 
 @app.route('/api/dashboard/summary', methods=['GET'])
 def dashboard_summary():
@@ -193,6 +191,11 @@ def inventory_metrics():
         })
 
     return jsonify(result), 200
+
+# -------------------- METRICS ROUTE --------------------
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 # -------------------- MAIN --------------------
 if __name__ == '__main__':

@@ -4,3 +4,4 @@ Flask-Migrate
 Flask-RESTful
 psycopg2-binary
 Flask-Cors
+prometheus_flask_exporter
