@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: rani19/gogo-main-backend:latest
+          image: rani19/backend:v2
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:

@@ -4,17 +4,49 @@ from models import db, Product, RestockLog, LowStockProduct
 from app_config import Config
 from datetime import datetime, timedelta
 from sqlalchemy import text
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST  # ✅ Prometheus raw metrics
+import time
+
+# Prometheus Metrics
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, REGISTRY
 
 # -------------------- APP INIT --------------------
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config.from_object(Config)
 
-print("✅ Connected to DB:", app.config['SQLALCHEMY_DATABASE_URI'])
-
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 db.init_app(app)
+
+# -------------------- PROMETHEUS METRICS --------------------
+REQUEST_COUNTER = Counter(
+    'flask_http_request_total',
+    'Total number of HTTP requests grouped by method and endpoint',
+    ['method', 'endpoint']
+)
+
+REQUEST_LATENCY = Histogram(
+    'flask_http_request_duration_seconds',
+    'Histogram of response latency (seconds) by method and endpoint',
+    ['method', 'endpoint']
+)
+
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    try:
+        duration = time.time() - request.start_time
+        REQUEST_COUNTER.labels(method=request.method, endpoint=request.path).inc()
+        REQUEST_LATENCY.labels(method=request.method, endpoint=request.path).observe(duration)
+    except Exception as e:
+        print("❌ Prometheus metric error:", e)
+    return response
+
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
 
 # -------------------- PRODUCTS ROUTES --------------------
 @app.route('/api/products', methods=['GET', 'POST'])
@@ -191,11 +223,6 @@ def inventory_metrics():
         })
 
     return jsonify(result), 200
-
-# -------------------- METRICS ROUTE --------------------
-@app.route('/metrics')
-def metrics():
-    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 # -------------------- MAIN --------------------
 if __name__ == '__main__':
