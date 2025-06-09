@@ -17,4 +17,3 @@ data:
       - job_name: 'flask-backend'
         static_configs:
           - targets: ['backend.default.svc.cluster.local:5000']
-
