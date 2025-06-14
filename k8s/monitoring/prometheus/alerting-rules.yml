@@ -1,7 +1,16 @@
 groups:
   - name: devops-project-alerts
     rules:
-      - alert: HighRequestVolumePerMinute
+      - alert: HighRequestVolumeRate
+        expr: sum(rate(flask_http_request_total[1m])) > 1.66
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Rate"
+          description: "Rate exceeds 1.66 requests/sec (≈100 requests/min) across the backend."
+
+      - alert: HighRequestVolumeIncrease
         expr: increase(flask_http_request_total[1m]) > 100
         for: 30s
         labels:
@@ -9,15 +18,6 @@ groups:
         annotations:
           summary: "High Request Volume"
           description: "More than 100 HTTP requests were made in the past minute."
-
-      - alert: HighRequestRate
-        expr: sum(rate(flask_http_request_total[1m])) > 1.66
-        for: 30s
-        labels:
-          severity: warning
-        annotations:
-          summary: "High Request Rate"
-          description: "Rate exceeds 1.66 requests/sec (≈100 requests/min)."
 
       - alert: BackendServiceDown
         expr: up{job="flask-backend"} == 0
@@ -30,7 +30,7 @@ groups:
 
       - alert: High5xxErrorRate
         expr: rate(flask_http_request_total{status=~"5.."}[1m]) > 0.5
-        for: 1m
+        for: 30s
         labels:
           severity: critical
         annotations:
