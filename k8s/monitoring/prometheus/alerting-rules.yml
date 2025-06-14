@@ -1,0 +1,38 @@
+groups:
+  - name: devops-project-alerts
+    rules:
+      - alert: HighRequestVolumePerMinute
+        expr: increase(flask_http_request_total[1m]) > 100
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Volume"
+          description: "More than 100 HTTP requests were made in the past minute."
+
+      - alert: HighRequestRate
+        expr: sum(rate(flask_http_request_total[1m])) > 1.66
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Rate"
+          description: "Rate exceeds 1.66 requests/sec (≈100 requests/min)."
+
+      - alert: BackendServiceDown
+        expr: up{job="flask-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flask Backend is Down"
+          description: "Prometheus could not scrape metrics from the backend service."
+
+      - alert: High5xxErrorRate
+        expr: rate(flask_http_request_total{status=~"5.."}[1m]) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Rate of 5xx Errors"
+          description: "More than 0.5 5xx errors/sec. Check logs or DB connectivity."
