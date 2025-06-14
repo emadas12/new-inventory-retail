@@ -15,16 +15,23 @@ spec:
     spec:
       containers:
         - name: prometheus
-          image: prom/prometheus:latest
+          image: prom/prometheus
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
-            - "--web.listen-address=:9090"
+            - "--storage.tsdb.path=/prometheus"
+            - "--web.enable-lifecycle"
           ports:
             - containerPort: 9090
           volumeMounts:
-            - name: config-volume
-              mountPath: /etc/prometheus/
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-recording-rules
+              mountPath: /etc/prometheus/rules
+              readOnly: true
       volumes:
-        - name: config-volume
+        - name: prometheus-config
           configMap:
             name: prometheus-config
+        - name: prometheus-recording-rules
+          configMap:
+            name: prometheus-recording-rules

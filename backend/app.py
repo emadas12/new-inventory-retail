@@ -5,11 +5,8 @@ from app_config import Config
 from datetime import datetime, timedelta
 from sqlalchemy import text
 import time
-
-# Prometheus Metrics
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, REGISTRY
 
-# -------------------- APP INIT --------------------
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config.from_object(Config)
@@ -17,11 +14,10 @@ app.config.from_object(Config)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 db.init_app(app)
 
-# -------------------- PROMETHEUS METRICS --------------------
 REQUEST_COUNTER = Counter(
     'flask_http_request_total',
-    'Total number of HTTP requests grouped by method and endpoint',
-    ['method', 'endpoint']
+    'Total number of HTTP requests grouped by method, endpoint and status',
+    ['method', 'endpoint', 'status']
 )
 
 REQUEST_LATENCY = Histogram(
@@ -37,24 +33,22 @@ def before_request():
 @app.after_request
 def after_request(response):
     try:
-        duration = time.time() - request.start_time
-        REQUEST_COUNTER.labels(method=request.method, endpoint=request.path).inc()
+        duration = time.time() - request.start_time if hasattr(request, 'start_time') else 0
+        REQUEST_COUNTER.labels(method=request.method, endpoint=request.path, status=str(response.status_code)).inc()
         REQUEST_LATENCY.labels(method=request.method, endpoint=request.path).observe(duration)
-    except Exception as e:
-        print("❌ Prometheus metric error:", e)
+    except Exception:
+        pass
     return response
 
 @app.route('/metrics')
 def metrics():
     return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
 
-# -------------------- PRODUCTS ROUTES --------------------
 @app.route('/api/products', methods=['GET', 'POST'])
 def manage_products():
     if request.method == 'GET':
         products = Product.query.all()
         return jsonify([p.to_dict() for p in products]), 200
-
     elif request.method == 'POST':
         data = request.get_json()
         try:
@@ -69,16 +63,13 @@ def manage_products():
             )
             db.session.add(new_product)
             db.session.flush()
-
             if new_product.stock_level <= new_product.low_stock_threshold:
-                low_stock_entry = LowStockProduct(
+                db.session.add(LowStockProduct(
                     product_id=new_product.id,
                     name=new_product.name,
                     sku=new_product.sku,
                     stock_level=new_product.stock_level
-                )
-                db.session.add(low_stock_entry)
-
+                ))
             db.session.commit()
             return jsonify(new_product.to_dict()), 201
         except KeyError as e:
@@ -87,16 +78,13 @@ def manage_products():
 @app.route('/api/products/<int:product_id>', methods=['GET', 'PUT', 'DELETE'])
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-
     if request.method == 'GET':
         return jsonify(product.to_dict()), 200
-
     elif request.method == 'PUT':
         data = request.get_json()
         try:
             old_stock = product.stock_level
             new_stock = data.get('stock_level', old_stock)
-
             product.name = data['name']
             product.sku = data['sku']
             product.category = data.get('category')
@@ -104,18 +92,16 @@ def product_detail(product_id):
             product.cost = data.get('cost')
             product.stock_level = new_stock
             product.low_stock_threshold = data.get('low_stock_threshold', product.low_stock_threshold)
-
             if new_stock != old_stock:
                 db.session.add(RestockLog(product_id=product.id, quantity=new_stock - old_stock))
-
             if new_stock > product.low_stock_threshold:
                 db.session.query(LowStockProduct).filter_by(product_id=product.id).delete()
             else:
-                low_stock_entry = LowStockProduct.query.filter_by(product_id=product.id).first()
-                if low_stock_entry:
-                    low_stock_entry.name = product.name
-                    low_stock_entry.sku = product.sku
-                    low_stock_entry.stock_level = product.stock_level
+                entry = LowStockProduct.query.filter_by(product_id=product.id).first()
+                if entry:
+                    entry.name = product.name
+                    entry.sku = product.sku
+                    entry.stock_level = product.stock_level
                 else:
                     db.session.add(LowStockProduct(
                         product_id=product.id,
@@ -123,12 +109,10 @@ def product_detail(product_id):
                         sku=product.sku,
                         stock_level=product.stock_level
                     ))
-
             db.session.commit()
             return jsonify(product.to_dict()), 200
         except KeyError as e:
             return jsonify({"error": f"Missing field: {e}"}), 400
-
     elif request.method == 'DELETE':
         RestockLog.query.filter_by(product_id=product.id).delete()
         db.session.query(LowStockProduct).filter_by(product_id=product.id).delete()
@@ -136,13 +120,11 @@ def product_detail(product_id):
         db.session.commit()
         return jsonify({'result': True}), 204
 
-# -------------------- RESTOCK ROUTES --------------------
 @app.route('/api/restocks', methods=['GET'])
 def get_restock_logs():
     logs = RestockLog.query.order_by(RestockLog.timestamp.desc()).limit(5).all()
     return jsonify([log.to_dict() for log in logs]), 200
 
-# -------------------- DASHBOARD ROUTES --------------------
 @app.route('/api/products/low-stock', methods=['GET'])
 def low_stock_products():
     entries = LowStockProduct.query.order_by(LowStockProduct.timestamp.desc()).all()
@@ -154,10 +136,8 @@ def dashboard_summary():
     total_products = len(products)
     total_value = sum((p.price or 0) * (p.stock_level or 0) for p in products)
     low_stock_count = len([p for p in products if (p.stock_level or 0) < (p.low_stock_threshold or 10)])
-
     since = datetime.utcnow() - timedelta(days=1)
     restocks_count = RestockLog.query.filter(RestockLog.timestamp >= since).count()
-
     return jsonify({
         "totalProducts": total_products,
         "totalValue": total_value,
@@ -165,18 +145,15 @@ def dashboard_summary():
         "restocksPending": restocks_count
     }), 200
 
-# -------------------- ANALYTICS ROUTES --------------------
 @app.route('/api/analytics/inventory-trend', methods=['GET'])
 def inventory_trend():
     today = datetime.utcnow().date()
     products = Product.query.all()
     trend_data = []
-
     for i in range(30):
         day = today - timedelta(days=29 - i)
         total_stock = sum(p.stock_level for p in products)
         trend_data.append({"date": day.isoformat(), "stock": total_stock})
-
     return jsonify(trend_data), 200
 
 @app.route('/api/analytics/product-trend/<int:product_id>', methods=['GET'])
@@ -191,26 +168,22 @@ def inventory_metrics():
     today = datetime.utcnow().date()
     products = Product.query.all()
     result = []
-
     for product in products:
         current_stock = product.stock_level
         dates = [today - timedelta(days=i) for i in range(29, -1, -1)]
         stock_by_day = {date: current_stock for date in dates}
-
         logs = RestockLog.query.filter_by(product_id=product.id).order_by(RestockLog.timestamp.asc()).all()
         for log in logs:
             log_date = log.timestamp.date()
             for d in dates:
                 if d < log_date:
                     stock_by_day[d] -= log.quantity
-
         stock_values = list(stock_by_day.values())
         min_stock = min(stock_values)
         max_stock = max(stock_values)
         first_stock = stock_values[0]
         change = current_stock - first_stock
         change_percent = round((change / first_stock) * 100, 1) if first_stock > 0 else "N/A"
-
         result.append({
             "id": product.id,
             "name": product.name,
@@ -221,15 +194,13 @@ def inventory_metrics():
             "changeAmount": change,
             "changePercent": f"{change_percent}%" if isinstance(change_percent, float) else "N/A"
         })
-
     return jsonify(result), 200
 
-# -------------------- MAIN --------------------
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         result = db.session.execute(text("SELECT oid, datname FROM pg_database WHERE datname = current_database();"))
         for row in result:
             print("🧠 Flask DB OID:", row[0], "| Name:", row[1])
+    app.run(host='0.0.0.0', port=5000)
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
