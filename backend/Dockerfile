@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the entire app
 COPY . .
+# other Dockerfile instructions...
 
 # Expose the port Flask runs on
 EXPOSE 5000

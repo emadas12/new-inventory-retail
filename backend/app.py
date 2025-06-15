@@ -1,16 +1,25 @@
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
+<<<<<<< HEAD
 from models import db, Product, RestockLog, LowStockProduct
 from app_config import Config
 from datetime import datetime, timedelta
 from sqlalchemy import text
 import time
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, REGISTRY
+=======
+from .models import db, Product, RestockLog, LowStockProduct
+from .app_config import Config
+from datetime import datetime, timedelta
+from sqlalchemy import text
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 
+# -------------------- APP INIT --------------------
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config.from_object(Config)
 
+<<<<<<< HEAD
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 db.init_app(app)
 
@@ -44,11 +53,23 @@ def after_request(response):
 def metrics():
     return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
 
+=======
+print("✅ Connected to DB:", app.config['SQLALCHEMY_DATABASE_URI'])
+
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+db.init_app(app)
+
+# -------------------- PRODUCTS ROUTES --------------------
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 @app.route('/api/products', methods=['GET', 'POST'])
 def manage_products():
     if request.method == 'GET':
         products = Product.query.all()
         return jsonify([p.to_dict() for p in products]), 200
+<<<<<<< HEAD
+=======
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
     elif request.method == 'POST':
         data = request.get_json()
         try:
@@ -62,6 +83,7 @@ def manage_products():
                 low_stock_threshold=data.get('low_stock_threshold', 10)
             )
             db.session.add(new_product)
+<<<<<<< HEAD
             db.session.flush()
             if new_product.stock_level <= new_product.low_stock_threshold:
                 db.session.add(LowStockProduct(
@@ -74,10 +96,33 @@ def manage_products():
             return jsonify(new_product.to_dict()), 201
         except KeyError as e:
             return jsonify({"error": f"Missing field: {e}"}), 400
+=======
+            db.session.commit()  # ✅ חובה קודם לשמור כדי לקבל ID תקף
+
+            # עכשיו נמשוך שוב את המוצר מה־DB
+            saved_product = Product.query.filter_by(sku=new_product.sku).first()
+
+            # הוספה ל־low_stock_products אם צריך
+            if saved_product and saved_product.stock_level < saved_product.low_stock_threshold:
+                low_stock = LowStockProduct(
+                    product_id=saved_product.id,
+                    name=saved_product.name,
+                    sku=saved_product.sku,
+                    stock_level=saved_product.stock_level
+                )
+                db.session.add(low_stock)
+                db.session.commit()  # ✅ שורה הכרחית!
+
+            return jsonify(saved_product.to_dict()), 201
+        except KeyError as e:
+            return jsonify({"error": f"Missing field: {e}"}), 400
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 
 @app.route('/api/products/<int:product_id>', methods=['GET', 'PUT', 'DELETE'])
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
+
     if request.method == 'GET':
         return jsonify(product.to_dict()), 200
     elif request.method == 'PUT':
@@ -92,6 +137,7 @@ def product_detail(product_id):
             product.cost = data.get('cost')
             product.stock_level = new_stock
             product.low_stock_threshold = data.get('low_stock_threshold', product.low_stock_threshold)
+<<<<<<< HEAD
             if new_stock != old_stock:
                 db.session.add(RestockLog(product_id=product.id, quantity=new_stock - old_stock))
             if new_stock > product.low_stock_threshold:
@@ -109,35 +155,107 @@ def product_detail(product_id):
                         sku=product.sku,
                         stock_level=product.stock_level
                     ))
+=======
+
+            if new_stock != old_stock:
+                db.session.add(RestockLog(product_id=product.id, quantity=new_stock - old_stock))
+
+            # ✅ ניהול טבלת low_stock_products
+            if new_stock < product.low_stock_threshold:
+                exists = LowStockProduct.query.filter_by(product_id=product.id).first()
+                if not exists:
+                    low_stock = LowStockProduct(
+                        product_id=product.id,
+                        name=product.name,
+                        sku=product.sku,
+                        stock_level=new_stock
+                    )
+                    db.session.add(low_stock)
+            else:
+                LowStockProduct.query.filter_by(product_id=product.id).delete()
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
             db.session.commit()
             return jsonify(product.to_dict()), 200
         except KeyError as e:
             return jsonify({"error": f"Missing field: {e}"}), 400
+<<<<<<< HEAD
     elif request.method == 'DELETE':
         RestockLog.query.filter_by(product_id=product.id).delete()
         db.session.query(LowStockProduct).filter_by(product_id=product.id).delete()
+=======
+
+    elif request.method == 'DELETE':
+        RestockLog.query.filter_by(product_id=product.id).delete()
+        LowStockProduct.query.filter_by(product_id=product.id).delete()
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
         db.session.delete(product)
         db.session.commit()
         return jsonify({'result': True}), 204
 
+<<<<<<< HEAD
+=======
+# -------------------- RESTOCK ROUTES --------------------
+@app.route('/api/products/<int:product_id>/restock', methods=['POST'])
+def restock_product(product_id):
+    data = request.get_json()
+    product = Product.query.get_or_404(product_id)
+
+    try:
+        quantity = data['quantity']
+        product.stock_level += quantity
+
+        db.session.add(product)
+        db.session.add(RestockLog(product_id=product_id, quantity=quantity))
+
+        # ✅ מחיקה אוטומטית מטבלת מלאי נמוך
+        if product.stock_level >= product.low_stock_threshold:
+            LowStockProduct.query.filter_by(product_id=product.id).delete()
+
+        db.session.commit()
+        return jsonify(product.to_dict()), 200
+    except KeyError as e:
+        return jsonify({"error": f"Missing field: {e}"}), 400
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 @app.route('/api/restocks', methods=['GET'])
 def get_restock_logs():
     logs = RestockLog.query.order_by(RestockLog.timestamp.desc()).limit(5).all()
     return jsonify([log.to_dict() for log in logs]), 200
 
+<<<<<<< HEAD
 @app.route('/api/products/low-stock', methods=['GET'])
 def low_stock_products():
     entries = LowStockProduct.query.order_by(LowStockProduct.timestamp.desc()).all()
     return jsonify([entry.to_dict() for entry in entries]), 200
+=======
+# -------------------- LOW STOCK ROUTES --------------------
+@app.route('/api/products/low-stock', methods=['GET'])
+def low_stock_products():
+    products = Product.query.all()
+    low_stock = [
+        product for product in products
+        if product.stock_level < (product.low_stock_threshold or 10)
+    ]
+    return jsonify([product.to_dict() for product in low_stock]), 200
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 
+# -------------------- DASHBOARD ROUTES --------------------
 @app.route('/api/dashboard/summary', methods=['GET'])
 def dashboard_summary():
     products = Product.query.all()
     total_products = len(products)
     total_value = sum((p.price or 0) * (p.stock_level or 0) for p in products)
     low_stock_count = len([p for p in products if (p.stock_level or 0) < (p.low_stock_threshold or 10)])
+<<<<<<< HEAD
     since = datetime.utcnow() - timedelta(days=1)
     restocks_count = RestockLog.query.filter(RestockLog.timestamp >= since).count()
+=======
+
+    since = datetime.utcnow() - timedelta(days=1)
+    restocks_count = RestockLog.query.filter(RestockLog.timestamp >= since).count()
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
     return jsonify({
         "totalProducts": total_products,
         "totalValue": total_value,
@@ -145,11 +263,19 @@ def dashboard_summary():
         "restocksPending": restocks_count
     }), 200
 
+<<<<<<< HEAD
+=======
+# -------------------- ANALYTICS ROUTES --------------------
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 @app.route('/api/analytics/inventory-trend', methods=['GET'])
 def inventory_trend():
     today = datetime.utcnow().date()
     products = Product.query.all()
     trend_data = []
+<<<<<<< HEAD
+=======
+
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
     for i in range(30):
         day = today - timedelta(days=29 - i)
         total_stock = sum(p.stock_level for p in products)
@@ -202,5 +328,9 @@ if __name__ == '__main__':
         result = db.session.execute(text("SELECT oid, datname FROM pg_database WHERE datname = current_database();"))
         for row in result:
             print("🧠 Flask DB OID:", row[0], "| Name:", row[1])
+<<<<<<< HEAD
     app.run(host='0.0.0.0', port=5000)
+=======
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
 
+    app.run(host='0.0.0.0', port=5000, debug=True)

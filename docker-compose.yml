@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   db:
+<<<<<<< HEAD
     image: postgres:15
     container_name: gogo-main-db-1
     restart: always
@@ -21,11 +22,28 @@ services:
     restart: always
     depends_on:
       - db
+=======
+    image: postgres:14
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: flask-backend
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
     ports:
       - "5000:5000"
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
+<<<<<<< HEAD
     command: python app.py
 
   frontend:
@@ -53,3 +71,30 @@ services:
 volumes:
   pgdata:
   pgadmin-data:
+=======
+      - SQLALCHEMY_DATABASE_URI=postgresql://postgres:admin123@db:5432/inventory_db
+    depends_on:
+      - db
+    command: ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+
+  frontend:
+    build: ./frontend
+    container_name: react-frontend
+    ports:
+      - "8080:3000"
+    depends_on:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d

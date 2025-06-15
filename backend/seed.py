@@ -25,4 +25,8 @@ with app.app_context():
     db.create_all()  # יוצרת את הטבלאות אם הן לא קיימות
     db.session.bulk_save_objects(products)
     db.session.commit()
+<<<<<<< HEAD
     print("✅ Products seeded successfully!")
+=======
+    print("✅ Products seeded successfully!")
+>>>>>>> a06fb989811003506e81d3f5a412a9ead115a63d
