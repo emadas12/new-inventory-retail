@@ -6,8 +6,10 @@ groups:
         for: 30s
         labels:
           severity: warning
+          alert_type: performance
+          team: devops
         annotations:
-          summary: "High Request Rate"
+          summary: "⚠️ High Request Rate"
           description: "Rate exceeds 1.66 requests/sec (≈100 requests/min) across the backend."
 
       - alert: HighRequestVolumeIncrease
@@ -15,8 +17,10 @@ groups:
         for: 30s
         labels:
           severity: warning
+          alert_type: traffic
+          team: devops
         annotations:
-          summary: "High Request Volume"
+          summary: "⚠️ High Request Volume"
           description: "More than 100 HTTP requests were made in the past minute."
 
       - alert: BackendServiceDown
@@ -24,8 +28,10 @@ groups:
         for: 30s
         labels:
           severity: critical
+          alert_type: availability
+          team: backend
         annotations:
-          summary: "Flask Backend is Down"
+          summary: "🔥 Flask Backend is Down"
           description: "Prometheus could not scrape metrics from the backend service."
 
       - alert: High5xxErrorRate
@@ -33,6 +39,8 @@ groups:
         for: 30s
         labels:
           severity: critical
+          alert_type: error
+          team: backend
         annotations:
-          summary: "High Rate of 5xx Errors"
-          description: "More than 0.5 5xx errors/sec. Check logs or DB connectivity."
+          summary: "🔥 High 5xx Error Rate"
+          description: "More than 0.5 5xx errors/sec detected. Check app logs or DB connectivity."
